@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Auto Send ETH (Optimism)</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 50px;
+      background-color: #f9f9f9;
+    }
+
+    input {
+      padding: 12px;
+      margin: 10px;
+      font-size: 18px;
+      width: 80%;
+      max-width: 400px;
+    }
+
+    button {
+      padding: 15px 40px;
+      font-size: 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #3e9142;
+    }
+
+    #status {
+      margin-top: 25px;
+      font-size: 16px;
+      color: #333;
+      max-width: 90%;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <h2>Auto Send ETH (Optimism)</h2>
+  <input id="toAddress" type="text" placeholder="Recipient Address"><br>
+  <input id="amount" type="text" placeholder="Amount in ETH"><br>
+  <input id="interval" type="number" placeholder="Interval in ms (e.g. 1000 for 1s)"><br>
+  <button onclick="startSending()">Start Sending</button>
+  <div id="status"></div>
+
+  <script>
+    let sending = false;
+
+    async function switchToOP() {
+      const OP_CHAIN_ID = '0xa';
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: OP_CHAIN_ID }],
+        });
+        return true;
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: OP_CHAIN_ID,
+                chainName: 'Optimism',
+                nativeCurrency: {
+                  name: 'Ether',
+                  symbol: 'ETH',
+                  decimals: 18
+                },
+                rpcUrls: ['https://mainnet.optimism.io'],
+                blockExplorerUrls: ['https://optimistic.etherscan.io']
+              }]
+            });
+            return true;
+          } catch (addError) {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+    }
+
+    async function startSending() {
+      const to = document.getElementById('toAddress').value;
+      const amount = document.getElementById('amount').value;
+      const interval = parseInt(document.getElementById('interval').value);
+      const status = document.getElementById('status');
+
+      if (!to || !amount) {
+        status.innerText = "Please fill in all fields!";
+        return;
+      }
+
+      const switched = await switchToOP();
+      if (!switched) {
+        status.innerText = "Failed to switch/add Optimism network!";
+        return;
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      const signer = await provider.getSigner();
+      const value = ethers.parseEther(amount);
+
+      sending = true;
+      status.innerText = "Sending started...";
+
+      async function sendOnce() {
+        if (!sending) return;
+        try {
+          const tx = await signer.sendTransaction({ to, value });
+          status.innerHTML = `Tx sent: <a href="https://optimistic.etherscan.io/tx/${tx.hash}" target="_blank">${tx.hash}</a>`;
+        } catch (err) {
+          status.innerText = "Error: " + (err.reason || err.message || err);
+        }
+
+        if (interval > 0) {
+          setTimeout(sendOnce, interval);
+        } else {
+          sendOnce(); // Instant repeat (careful!)
+        }
+      }
+
+      sendOnce();
+    }
+  </script>
+</body>
+</html>
