@@ -116,17 +116,23 @@
       status.innerText = "Sending started...";
 
       async function sendOnce() {
-  if (!sending) return;
-  try {
-    const tx = await signer.sendTransaction({ to, value });
-    console.log("Tx sent:", tx.hash);
-    status.innerHTML = `Tx sent: <a href="https://optimistic.etherscan.io/tx/${tx.hash}" target="_blank">${tx.hash}</a><br>`;
-  } catch (err) {
-    status.innerText = "Error: " + (err.reason || err.message || err);
-  }
+        if (!sending) return;
+        try {
+          const tx = await signer.sendTransaction({ to, value });
+          status.innerHTML = `Tx sent: <a href="https://optimistic.etherscan.io/tx/${tx.hash}" target="_blank">${tx.hash}</a>`;
+        } catch (err) {
+          status.innerText = "Error: " + (err.reason || err.message || err);
+        }
 
-  requestAnimationFrame(sendOnce); // spam secepat mungkin TANPA menunggu tx selesai
+        if (interval > 0) {
+          setTimeout(sendOnce, interval);
+        } else {
+          sendOnce(); // Instant repeat (careful!)
+        }
       }
+
+      sendOnce();
+    }
   </script>
 </body>
 </html>
